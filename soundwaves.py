@@ -13,8 +13,7 @@ CHUNK = 1024 * 4
 FORMAT = pyaudio.paInt16 
 CHANNELS = 1 
 RATE = 44100
-
-
+use_fft = False
 p = pyaudio.PyAudio()
 
 stream = p.open(
@@ -36,21 +35,35 @@ while True:
 	except OSError:
 		columns, rows = os.get_terminal_size(1)
 	data = stream.read(CHUNK)
-	data_int = np.array(struct.unpack(str(2*CHUNK)+ 'B',data), dtype='b')
-
-	fourier = scipy.fftpack.fft(data_int)
-	fourier_real = fourier[0:len(fourier)//4]
+	if(use_fft):
+		data_int = np.array(struct.unpack(str(2*CHUNK)+ 'B',data), dtype='b')
+	else:
+		data_int = np.array(struct.unpack(str(2*CHUNK)+ 'B',data), dtype='b')[::2]
+	if(use_fft):
+		fourier = scipy.fftpack.fft(data_int)
+		fourier_real = fourier[0:len(fourier)//4]
 	
 	char = ""
 
 	for i in range(rows):
 		for j in range(columns):
-			index = len(fourier_real)*j//columns - 1
-			val = np.abs(np.real(fourier_real[index]))
-			n = valMap(val, 0, 250000, 0, columns)
-			if (rows-i-n<=0):
-				char+="*"
+			if(use_fft):
+				index = len(fourier_real)*j//columns - 1
+				val = np.abs(np.real(fourier_real[index]))
+				n = valMap(val, 0, 25000, 0, rows)
 			else:
-				char+=" "
+				index = len(data_int/20)*j//columns - 1
+				val = data_int[index]
+				n = valMap(val, -127, 127, 0, rows/3)+rows/2.5
+			if(use_fft):
+				if (rows-i-n<=0):
+					char+="@"
+				else:
+					char+=" "
+			else:
+				if (abs(n-i)<1):
+					char+="@"
+				else:
+					char+=" "
 	os.system("cls")
 	print(char)
